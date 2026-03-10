@@ -1,0 +1,78 @@
+# TestPilot AI — Configuration
+# Copy this to config.yaml and fill in your values
+
+project:
+  name: "MyOrg TestPilot"
+  base_url: "http://localhost:8000"        # Your Python backend URL
+
+anthropic:
+  api_key: "sk-ant-..."                    # Your Anthropic API key
+
+# Python Backend
+backend:
+  url: "http://localhost:8000"
+  test_output_dir: "tests/ai_generated"    # Where AI-generated tests go
+  source_dirs:                             # Your Python source directories
+    - "src/"
+    - "api/"
+    - "services/"
+
+# Siebel CRM
+siebel:
+  enabled: true
+  mode: "rest"                             # "rest" or "soap" or "both"
+  rest:
+    base_url: "https://siebel.yourorg.com/siebel/v1.0/data"
+    auth_type: "basic"                     # "basic" or "token"
+    username: "SIEBEL_USER"
+    password: "SIEBEL_PASS"
+  soap:
+    wsdl_url: "https://siebel.yourorg.com/siebel/v1.0/service/wsdl"
+    username: "SIEBEL_USER"
+    password: "SIEBEL_PASS"
+
+# SOLR
+solr:
+  enabled: true
+  base_url: "http://solr.yourorg.com:8983/solr"
+  collections:                             # List all your SOLR collections
+    - name: "jobs"
+      required_fields: ["id", "title", "company", "location", "posted_date"]
+    - name: "candidates"
+      required_fields: ["id", "name", "email", "skills"]
+  golden_queries:                          # Queries that should always return results
+    - collection: "jobs"
+      query: "*:*"
+      min_results: 1
+
+# React Frontend (Playwright)
+frontend:
+  enabled: true
+  url: "http://localhost:3000"
+  auth:
+    email: "test@yourorg.com"
+    password: "testpass123"
+  smoke_tests:
+    - path: "/"
+      wait_for: "h1"
+    - path: "/login"
+      wait_for: "input[type='email']"
+    - path: "/dashboard"
+      requires_auth: true
+
+# Notifications
+notifications:
+  telegram:
+    enabled: true
+    bot_token: ""                          # Your Telegram bot token
+    chat_id: ""                            # Your Telegram chat ID / group ID
+  slack:
+    enabled: false
+    webhook_url: ""
+
+# Reporting
+reporting:
+  google_sheets:
+    enabled: false
+    spreadsheet_id: ""
+    credentials_file: "gws-credentials.json"

@@ -1,0 +1,331 @@
+================================================================================
+  TESTPILOT AI — INSTALLATION & SETUP GUIDE
+================================================================================
+
+  Prerequisites  : Python 3.11+, Node.js 18+, Git
+  Time required  : ~15 minutes
+  Tested on      : Windows 11, Ubuntu 22.04, macOS 14
+
+================================================================================
+  STEP 1 — CLONE THE REPO
+================================================================================
+
+  git clone https://github.com/saikatpatra-23/testpilot-ai.git
+  cd testpilot-ai
+
+
+================================================================================
+  STEP 2 — PYTHON SETUP
+================================================================================
+
+  # Create virtual environment (recommended)
+  python -m venv venv
+
+  # Activate it
+  # Windows:
+  venv\Scripts\activate
+  # macOS/Linux:
+  source venv/bin/activate
+
+  # Install dependencies
+  pip install -r requirements.txt
+
+  # Verify installation
+  python -m testpilot --help
+
+  Expected output:
+    usage: testpilot [-h] {run,generate,solr,react} ...
+    TestPilot AI
+
+
+================================================================================
+  STEP 3 — NODE / PLAYWRIGHT SETUP
+================================================================================
+
+  # Install Node dependencies
+  npm install
+
+  # Install Playwright browser (Chromium only — ~170MB)
+  npx playwright install chromium
+
+  # Verify
+  node -e "const {chromium} = require('playwright'); console.log('Playwright OK')"
+
+  Expected output: Playwright OK
+
+
+================================================================================
+  STEP 4 — CONFIGURE FOR YOUR ORG
+================================================================================
+
+  # Copy the example config
+  cp config.example.yaml config.yaml
+
+  # Open config.yaml and fill in:
+  notepad config.yaml    # Windows
+  nano config.yaml       # Linux/Mac
+
+  ── REQUIRED FIELDS ──────────────────────────────────────────────────────────
+
+  anthropic:
+    api_key: "sk-ant-..."          ← Get from https://console.anthropic.com
+
+  backend:
+    url: "http://your-api:8000"    ← Your Python backend URL
+
+  siebel:
+    enabled: true
+    rest:
+      base_url: "https://siebel.yourorg.com/siebel/v1.0/data"
+      username: "SIEBEL_USER"      ← Or set env var SIEBEL_USERNAME
+      password: "SIEBEL_PASS"      ← Or set env var SIEBEL_PASSWORD
+
+  solr:
+    enabled: true
+    base_url: "http://solr.yourorg.com:8983/solr"
+    collections:
+      - name: "your_collection"    ← Your actual SOLR collection name
+        required_fields:           ← Fields every document must have
+          - "id"
+          - "title"
+
+  frontend:
+    enabled: true
+    url: "http://localhost:3000"   ← Your React app URL
+    auth:
+      email: "testuser@yourorg.com"
+      password: "testpassword"
+
+  notifications:
+    telegram:
+      enabled: true
+      bot_token: "..."             ← See TELEGRAM SETUP below
+      chat_id: "..."               ← Your group/personal chat ID
+
+  ─────────────────────────────────────────────────────────────────────────────
+
+  TELEGRAM SETUP (5 minutes):
+  ─────────────────────────────
+  1. Open Telegram → search "@BotFather"
+  2. Send: /newbot
+  3. Choose a name: "MyOrg TestPilot"
+  4. Choose a username: "myorg_testpilot_bot"
+  5. Copy the token → paste in config.yaml bot_token
+
+  Get your chat_id:
+  1. Message your bot
+  2. Open: https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates
+  3. Find "chat":{"id": XXXXXXXX}  ← that's your chat_id
+
+  For a group: Add the bot to your dev group, then get the group's chat_id
+  (will be negative, like -100123456789)
+
+
+================================================================================
+  STEP 5 — GENERATE YOUR FIRST TESTS
+================================================================================
+
+  # Point TestPilot at your existing Python code
+  # Option A: Specific file
+  python -m testpilot generate --source path/to/your/api/endpoints.py
+
+  # Option B: All files changed since last commit
+  python -m testpilot generate --diff HEAD~1
+
+  # Option C: All files in configured source dirs
+  python -m testpilot generate
+
+  Review the generated tests:
+  ls tests/ai_generated/
+  cat tests/ai_generated/test_ai_endpoints.py
+
+  ⚠ IMPORTANT: Review AI-generated tests before committing.
+    They are a starting point — adjust mocks and assertions to match
+    your actual data shapes and business rules.
+
+
+================================================================================
+  STEP 6 — RUN TESTS LOCALLY
+================================================================================
+
+  # Run everything
+  python -m testpilot run
+
+  # Run only Python backend tests
+  pytest tests/ -v
+
+  # Run only SOLR validation
+  python -m testpilot solr
+
+  # Run only React E2E (Playwright)
+  python -m testpilot react
+  # OR directly:
+  APP_URL=http://localhost:3000 node scripts/playwright_runner.js
+
+  # Run example tests (no config needed, all mocked)
+  pytest tests/examples/ -v
+
+  Expected output (examples):
+    tests/examples/test_python_api.py::TestHealthCheck::test_health_returns_200 PASSED
+    tests/examples/test_siebel_contracts.py::TestSiebelRESTContracts::test_account_response_schema PASSED
+    tests/examples/test_solr_validation.py::TestSOLRSchema::test_jobs_required_fields_present PASSED
+    ...
+
+
+================================================================================
+  STEP 7 — CI/CD SETUP (GitHub Actions)
+================================================================================
+
+  # Copy workflow to your org's repo
+  cp .github/workflows/testpilot.yml  your-org-repo/.github/workflows/
+
+  # Add secrets in GitHub:
+  # Go to: your-repo → Settings → Secrets and variables → Actions → New secret
+
+  Required secrets:
+  ┌────────────────────────┬──────────────────────────────────────────────────┐
+  │  Secret Name           │  Value                                           │
+  ├────────────────────────┼──────────────────────────────────────────────────┤
+  │  ANTHROPIC_API_KEY     │  sk-ant-api03-...                                │
+  │  SIEBEL_USERNAME       │  your Siebel service account username            │
+  │  SIEBEL_PASSWORD       │  your Siebel service account password            │
+  │  SOLR_URL              │  http://solr.yourorg.com:8983/solr               │
+  │  TELEGRAM_BOT_TOKEN    │  8769046117:AAEtXXXXXXXXXXX                      │
+  │  TELEGRAM_CHAT_ID      │  -100123456789 (group) or 793607380 (personal)   │
+  │  APP_URL               │  https://your-react-app.yourorg.com              │
+  └────────────────────────┴──────────────────────────────────────────────────┘
+
+  # Test the workflow manually:
+  # GitHub → your repo → Actions → TestPilot AI → Run workflow
+
+
+================================================================================
+  PLUGGING INTO YOUR EXISTING ORG REPO
+================================================================================
+
+  OPTION A: Subfolder (Recommended — no package publish needed)
+  ──────────────────────────────────────────────────────────────
+
+  # Copy testpilot/ folder into your org's repo root
+  cp -r testpilot-ai/testpilot/   your-org-repo/testpilot/
+  cp -r testpilot-ai/tests/       your-org-repo/tests/
+  cp    testpilot-ai/scripts/playwright_runner.js  your-org-repo/scripts/
+  cp    testpilot-ai/config.example.yaml  your-org-repo/
+  cp    testpilot-ai/requirements.txt     your-org-repo/requirements-testpilot.txt
+
+  # Install in your org's venv
+  cd your-org-repo
+  pip install -r requirements-testpilot.txt
+
+  # Run
+  python -m testpilot run
+
+
+  OPTION B: Install as a package (if org uses internal PyPI)
+  ──────────────────────────────────────────────────────────
+
+  # In your org's repo:
+  pip install git+https://github.com/saikatpatra-23/testpilot-ai.git
+
+  # Then use as:
+  python -m testpilot generate --source src/
+  python -m testpilot run
+
+
+================================================================================
+  USING THE ADAPTERS IN YOUR EXISTING TESTS
+================================================================================
+
+  SIEBEL REST (add to any existing pytest file):
+  ───────────────────────────────────────────────
+
+    from testpilot.adapters.siebel_rest import make_siebel_mock
+
+    def test_your_existing_siebel_function():
+        with make_siebel_mock({
+            "Account": [{"Id": "1-ABC", "Name": "Tata", "Type": "Customer"}]
+        }):
+            result = your_crm_module.get_account("1-ABC")
+            assert result["Name"] == "Tata"
+
+
+  SIEBEL SOAP (add to any existing pytest file):
+  ────────────────────────────────────────────────
+
+    from testpilot.adapters.siebel_soap import mock_siebel_soap
+
+    def test_your_existing_soap_function():
+        with mock_siebel_soap({
+            "QueryOpportunity": {"Id": "OPP-001", "Stage": "Proposal"}
+        }):
+            result = your_soap_module.get_opportunity("OPP-001")
+            assert result["Stage"] == "Proposal"
+
+
+  SOLR (live or mocked):
+  ───────────────────────
+
+    from testpilot.adapters.solr import SOLRValidator
+
+    def test_solr_schema():
+        # Live (set SOLR_LIVE=1 in env to run this)
+        validator = SOLRValidator("http://your-solr:8983/solr")
+        missing = validator.check_required_fields(
+            "your_collection",
+            ["id", "title", "status"]
+        )
+        assert missing == [], f"Schema drift: {missing}"
+
+
+================================================================================
+  TROUBLESHOOTING
+================================================================================
+
+  Issue: python -m testpilot gives "ModuleNotFoundError"
+  Fix:   Make sure venv is activated: source venv/bin/activate (or venv\Scripts\activate)
+         Then: pip install -r requirements.txt
+
+  Issue: "config.yaml not found"
+  Fix:   cp config.example.yaml config.yaml  (then fill in your values)
+         OR run from the testpilot-ai/ directory
+
+  Issue: Playwright "Executable doesn't exist"
+  Fix:   npx playwright install chromium
+
+  Issue: Siebel tests failing with "Connection refused"
+  Fix:   This is expected in CI — Siebel is mocked. If running live tests,
+         set SIEBEL_LIVE=1 and ensure VPN is connected.
+
+  Issue: SOLR tests failing with "Connection refused"
+  Fix:   Set SOLR_LIVE=1 only if you have VPN/network access to SOLR.
+         By default, tests use mocks and don't require real SOLR.
+
+  Issue: Telegram notification not sending
+  Fix:   1. Verify bot_token is correct (no extra spaces)
+         2. Verify chat_id is correct (groups are negative numbers)
+         3. Test manually:
+            curl -X POST "https://api.telegram.org/bot<TOKEN>/sendMessage" \
+                 -d chat_id="<CHAT_ID>" -d text="TestPilot test message"
+
+  Issue: GitHub Actions workflow fails on "generate-tests" step
+  Fix:   ANTHROPIC_API_KEY secret not set → add it in GitHub repo secrets
+
+  Issue: React tests fail with "net::ERR_CONNECTION_REFUSED"
+  Fix:   APP_URL is wrong or React app is not running.
+         In CI, set APP_URL secret to your deployed staging URL.
+         Locally: start React app first (npm start), then run TestPilot.
+
+================================================================================
+  QUICK REFERENCE COMMANDS
+================================================================================
+
+  python -m testpilot run                      # run all test suites
+  python -m testpilot generate --diff HEAD~1   # generate tests for changed files
+  python -m testpilot generate --source f.py   # generate tests for specific file
+  python -m testpilot solr                     # SOLR checks only
+  python -m testpilot react                    # React E2E only
+  pytest tests/ -v                             # raw pytest (skip orchestrator)
+  pytest tests/examples/ -v                    # run examples (no config needed)
+  node scripts/playwright_runner.js            # raw Playwright runner
+
+================================================================================

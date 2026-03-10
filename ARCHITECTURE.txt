@@ -1,0 +1,386 @@
+================================================================================
+  TESTPILOT AI — SYSTEM ARCHITECTURE
+  AI-Powered Automated Testing for Enterprise Stacks
+================================================================================
+
+  VERSION : 0.1.0
+  STACK   : Python · Siebel CRM · Apache SOLR · React · Flutter · Kotlin · iOS
+  AUTHOR  : TestPilot AI
+
+================================================================================
+  HIGH-LEVEL OVERVIEW
+================================================================================
+
+                         ┌──────────────────────────────┐
+                         │       DEVELOPER WORKFLOW      │
+                         └──────────────┬───────────────┘
+                                        │
+                          git push / pull_request
+                                        │
+                         ┌──────────────▼───────────────┐
+                         │        GitHub Actions CI      │
+                         │   (testpilot.yml workflow)    │
+                         └──────────────┬───────────────┘
+                                        │
+              ┌─────────────────────────▼──────────────────────────┐
+              │                 TESTPILOT AI CORE                   │
+              │                                                      │
+              │   ┌──────────────┐      ┌──────────────────────┐   │
+              │   │ AI Generator │      │    Test Orchestrator  │   │
+              │   │  (Claude     │      │  (python -m testpilot │   │
+              │   │   Sonnet)    │      │    run / generate)    │   │
+              │   └──────┬───────┘      └──────────┬───────────┘   │
+              │          │                          │               │
+              │          └──────────┬───────────────┘               │
+              │                     │                               │
+              └─────────────────────┼───────────────────────────────┘
+                                    │
+              ┌─────────────────────▼───────────────────────────────┐
+              │                  TEST LAYERS                         │
+              │                                                      │
+              │  ┌────────────┐  ┌──────────┐  ┌────────────────┐  │
+              │  │  Python    │  │  Siebel  │  │     SOLR       │  │
+              │  │  Backend   │  │   CRM    │  │  Validation    │  │
+              │  │  (pytest)  │  │ Contract │  │  (schema +     │  │
+              │  │            │  │  Tests   │  │   freshness)   │  │
+              │  └────────────┘  └──────────┘  └────────────────┘  │
+              │                                                      │
+              │  ┌────────────┐  ┌──────────┐  ┌────────────────┐  │
+              │  │   React    │  │ Flutter  │  │  Kotlin / iOS  │  │
+              │  │ Playwright │  │  Tests   │  │  Native Tests  │  │
+              │  │  E2E + VR  │  │ (Phase2) │  │   (Phase 2)    │  │
+              │  └────────────┘  └──────────┘  └────────────────┘  │
+              └─────────────────────┬───────────────────────────────┘
+                                    │
+              ┌─────────────────────▼───────────────────────────────┐
+              │                  OUTPUT LAYER                        │
+              │                                                      │
+              │  ┌────────────┐  ┌──────────┐  ┌────────────────┐  │
+              │  │  Telegram  │  │ Screenshot│  │  JSON Reports  │  │
+              │  │  Alerts    │  │  Archive  │  │  (CI Artifacts)│  │
+              │  │ (pass/fail)│  │ (Snap)   │  │                │  │
+              │  └────────────┘  └──────────┘  └────────────────┘  │
+              └─────────────────────────────────────────────────────┘
+
+
+================================================================================
+  DETAILED COMPONENT BREAKDOWN
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  1. AI TEST GENERATOR  (testpilot/generator.py)                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  INPUT           PROCESS                          OUTPUT                   │
+│  ─────           ───────                          ──────                   │
+│  .py files  →   Claude reads function sigs   →   pytest files in          │
+│  git diff   →   + docstrings + type hints    →   tests/ai_generated/      │
+│  source dir →   + existing test patterns     →   (review + commit)        │
+│                                                                             │
+│  Claude Model : claude-sonnet-4-6                                          │
+│  Trigger      : PR opened, manual, --diff flag                             │
+│  Output path  : tests/ai_generated/test_ai_{filename}.py                  │
+│                                                                             │
+│  What Claude generates:                                                    │
+│  · Happy path tests for every public function                              │
+│  · Edge case tests (empty input, null, boundary values)                    │
+│  · Auth/permission tests (401, 403 scenarios)                              │
+│  · Siebel mock wrappers (never hits real Siebel)                           │
+│  · SOLR query shape validation tests                                       │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  2. PYTHON BACKEND TESTING  (pytest)                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Framework    : pytest + httpx                                             │
+│  Test types   : Unit · Integration · API contract                          │
+│  Coverage     : pytest-cov                                                 │
+│                                                                             │
+│  YOUR CODE                                                                 │
+│  ─────────                                                                 │
+│  src/api/*.py  ──→  AI generates  ──→  tests/ai_generated/test_ai_*.py   │
+│  services/*.py ──→  + you write   ──→  tests/unit/test_*.py               │
+│                                    ──→  tests/integration/test_*.py        │
+│                                                                             │
+│  httpx.Client(base_url="http://localhost:8000")                            │
+│    GET  /health          →  assert 200                                     │
+│    POST /auth/login      →  assert token returned                          │
+│    POST /api/leads       →  assert Siebel called with right shape          │
+│    GET  /api/search      →  assert SOLR query correct                      │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  3. SIEBEL CRM CONTRACT TESTING  (testpilot/adapters/siebel_*.py)          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  STRATEGY: Contract Testing — never hit real Siebel in CI.               │
+│  Tests prove YOUR CODE sends the right request shape.                     │
+│  If Siebel changes its API, the contract test catches it.                 │
+│                                                                             │
+│  REST FLOW:                                                                │
+│  ──────────                                                                │
+│  Your Code                                                                 │
+│     │  httpx.post("https://siebel.org/siebel/v1.0/data/Lead", json=...) │
+│     │                                                                      │
+│     ▼  [respx mock intercepts]                                             │
+│  Mock                                                                      │
+│     │  Returns {"Id": "1-ABC", "Status": "New"}                           │
+│     ▼                                                                      │
+│  Test asserts:                                                             │
+│     · Correct endpoint called                                              │
+│     · Required fields in request body (FirstName, LastName, Email)        │
+│     · Response parsed correctly                                            │
+│     · Error from Siebel → 503 returned to API caller                      │
+│                                                                             │
+│  SOAP FLOW:                                                                │
+│  ──────────                                                                │
+│  Your Code                                                                 │
+│     │  zeep.Client(wsdl).service.QueryOpportunity(Id="OPP-001")          │
+│     │                                                                      │
+│     ▼  [unittest.mock patches zeep.Client]                                │
+│  Mock                                                                      │
+│     │  Returns {"OpportunityId": "OPP-001", "SaleStage": "Proposal"}     │
+│     ▼                                                                      │
+│  Test asserts:                                                             │
+│     · Correct service method called                                        │
+│     · Required fields present in response                                  │
+│     · SOAP down → raises descriptive error (not silent fail)              │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  4. SOLR VALIDATION  (testpilot/adapters/solr.py)                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Runs against your actual SOLR (or mocked for unit tests).                │
+│                                                                             │
+│  CHECK 1 — Schema Integrity                                                │
+│  ─────────────────────────                                                 │
+│  Fetches 1 sample doc from each collection.                               │
+│  Verifies all required_fields are present.                                 │
+│  FAIL = schema drift (someone dropped a field in the indexer)             │
+│                                                                             │
+│  CHECK 2 — Relevance (Golden Queries)                                     │
+│  ────────────────────────────────────                                      │
+│  "Technical Program Manager" query → top 5 results must have TPM jobs.   │
+│  FAIL = relevance degraded (boosts/weights changed unintentionally)       │
+│                                                                             │
+│  CHECK 3 — Data Freshness                                                  │
+│  ─────────────────────────                                                 │
+│  0 docs older than 90 days in active index.                               │
+│  At least 1 doc from last 7 days (pipeline not stuck).                    │
+│  FAIL = indexing pipeline broken / zombie documents                       │
+│                                                                             │
+│  CHECK 4 — Null Data                                                       │
+│  ───────────────────                                                       │
+│  0 docs with null/missing title.                                           │
+│  0 docs with null/missing id.                                              │
+│  FAIL = bad data made it through ingestion validation                     │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  5. REACT FRONTEND E2E  (scripts/playwright_runner.js)                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Framework   : Playwright (Chromium)                                       │
+│  Mode        : headless: false (visible) by default, headless in CI       │
+│                                                                             │
+│  SMOKE TESTS (every route in config.yaml)                                 │
+│  ──────────────────────────────────────                                   │
+│  For each configured path:                                                 │
+│    → navigate to URL                                                       │
+│    → wait for expected selector                                            │
+│    → take full-page screenshot                                             │
+│    → verify auth guard (protected routes redirect to /login)              │
+│                                                                             │
+│  LOGIN FLOW TEST                                                           │
+│  ───────────────                                                           │
+│  → Go to /login                                                            │
+│  → Fill email + password (from config.yaml)                               │
+│  → Click submit                                                            │
+│  → Assert: redirected away from /login                                     │
+│  → FAIL if still on /login page or error message shown                    │
+│                                                                             │
+│  RESPONSIVE CHECK                                                          │
+│  ─────────────────                                                         │
+│  Desktop  : 1440 × 900                                                     │
+│  Tablet   : 768 × 1024                                                     │
+│  Mobile   : 375 × 812                                                      │
+│  Screenshot saved for each viewport → visual regression baseline          │
+│                                                                             │
+│  OUTPUT                                                                    │
+│  ──────                                                                    │
+│  /tmp/testpilot-screenshots/smoke_*.png                                   │
+│  /tmp/testpilot-screenshots/login_filled.png                              │
+│  /tmp/testpilot-screenshots/responsive_desktop.png                        │
+│  /tmp/testpilot-screenshots/responsive_tablet.png                         │
+│  /tmp/testpilot-screenshots/responsive_mobile.png                         │
+│  /tmp/testpilot-playwright-results.json  (for CI parsing)                 │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  6. NOTIFICATION LAYER  (testpilot/reporters/telegram.py)                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  After every CI run, TestPilot sends a Telegram message:                  │
+│                                                                             │
+│  ┌──────────────────────────────────────────┐                             │
+│  │  ✅ TestPilot AI — MyOrg                 │                             │
+│  │  Branch: main | 10 Mar 2026, 14:32       │                             │
+│  │                                          │                             │
+│  │  Total: 47 | Passed: 47 | Failed: 0     │                             │
+│  └──────────────────────────────────────────┘                             │
+│                                                                             │
+│  OR if failures:                                                            │
+│                                                                             │
+│  ┌──────────────────────────────────────────┐                             │
+│  │  ❌ TestPilot AI — MyOrg                 │                             │
+│  │  Branch: feature/leads-api | PR #42      │                             │
+│  │                                          │                             │
+│  │  Total: 47 | Passed: 44 | Failed: 3     │                             │
+│  │                                          │                             │
+│  │  Failed:                                 │                             │
+│  │  · test_create_lead_calls_siebel_rest    │                             │
+│  │  · test_login_valid_credentials          │                             │
+│  │  · SOLR jobs: missing field 'company'   │                             │
+│  └──────────────────────────────────────────┘                             │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+  CI/CD PIPELINE FLOW (GitHub Actions)
+================================================================================
+
+  Developer pushes to feature branch / opens PR
+              │
+              ▼
+  ┌───────────────────────────────────────────────────────┐
+  │  JOB 1: generate-tests (only on PR)                   │
+  │                                                       │
+  │  git diff origin/main → find changed .py files       │
+  │  → Claude generates pytest tests for each file       │
+  │  → tests/ai_generated/ uploaded as artifact          │
+  └───────────────────────┬───────────────────────────────┘
+                          │
+                          ▼
+  ┌───────────────────────────────────────────────────────┐
+  │  JOB 2: backend-tests                                 │
+  │                                                       │
+  │  · Download AI-generated tests from Job 1            │
+  │  · pip install -r requirements.txt                    │
+  │  · pytest tests/ --json-report → /tmp/report.json    │
+  │  · python -m testpilot solr (if SOLR enabled)        │
+  │  · Upload results as artifact                        │
+  │  · FAIL if any test fails                            │
+  └───────────────────────┬───────────────────────────────┘
+                          │
+                          ▼
+  ┌───────────────────────────────────────────────────────┐
+  │  JOB 3: frontend-tests                                │
+  │                                                       │
+  │  · npx playwright install chromium                    │
+  │  · Start React app (if local)                        │
+  │  · node scripts/playwright_runner.js                  │
+  │  · Upload screenshots as artifact                    │
+  └───────────────────────┬───────────────────────────────┘
+                          │
+                          ▼
+  ┌───────────────────────────────────────────────────────┐
+  │  JOB 4: notify                                        │
+  │                                                       │
+  │  · Collect results from Jobs 2 + 3                   │
+  │  · POST to Telegram bot API                          │
+  │  · Message includes: branch, PR#, pass/fail count    │
+  │  · Names of failed tests (up to 5)                   │
+  └───────────────────────────────────────────────────────┘
+
+
+================================================================================
+  DATA FLOW DIAGRAM
+================================================================================
+
+  Your Python Code (src/)
+       │
+       ├─── TestPilot AI reads ──→ Claude Sonnet generates tests
+       │                                    │
+       │                                    ▼
+       │                          tests/ai_generated/
+       │                                    │
+       ▼                                    ▼
+  pytest runs both ──────────────────────────────────→ JSON report
+       │
+       ├─── httpx calls your API ──→ your API calls Siebel
+       │         [respx intercepts]          │
+       │         returns mock response       │
+       │                                     ▼
+       │                           [contract validated]
+       │
+       ├─── SOLRValidator ──→ httpx GET solr/collection/select
+       │         [or mock]         │
+       │                           ▼
+       │                   [schema + freshness validated]
+       │
+       └─── Playwright ──→ Chromium opens your React app
+                                   │
+                          [smoke + login + responsive]
+                                   │
+                                   ▼
+                           /tmp/screenshots/
+
+  All results ──→ TelegramReporter ──→ Your Telegram group/bot
+
+
+================================================================================
+  TECHNOLOGY STACK
+================================================================================
+
+  LAYER               TECHNOLOGY         PURPOSE
+  ─────               ──────────         ───────
+  AI Engine           Claude Sonnet 4.6  Test generation from source code
+  Python Tests        pytest + httpx     Backend API + integration tests
+  REST Mocking        respx              Siebel REST contract tests
+  SOAP Mocking        zeep + mock        Siebel SOAP contract tests
+  SOLR                httpx              Schema drift + freshness validation
+  Browser             Playwright         React E2E + visual regression
+  Config              PyYAML             Single config.yaml for everything
+  CI/CD               GitHub Actions     Automated on every PR/push
+  Notifications       Telegram Bot API   Pass/fail alerts to dev team
+  Reporting           JSON + artifacts   Machine-readable results for dashboards
+
+
+================================================================================
+  PHASE ROADMAP
+================================================================================
+
+  PHASE 1 (NOW — current repo)
+  ────────────────────────────
+  ✅ Python backend pytest generation
+  ✅ Siebel REST + SOAP contract testing
+  ✅ SOLR schema + freshness validation
+  ✅ React Playwright E2E + responsive
+  ✅ GitHub Actions CI/CD pipeline
+  ✅ Telegram notifications
+
+  PHASE 2 (Next sprint)
+  ─────────────────────
+  ○ Flutter integration_test generation
+  ○ Kotlin Espresso test generation
+  ○ iOS XCTest generation
+  ○ Appium cross-platform mobile runner
+  ○ Visual regression baseline diffing
+  ○ Google Sheets auto test report dashboard
+
+  PHASE 3 (Future)
+  ────────────────
+  ○ Self-healing tests (AI fixes broken selectors)
+  ○ Performance benchmarking (response time regression)
+  ○ Security test generation (OWASP top 10)
+  ○ Load test generation (Locust scripts)
+
+================================================================================
