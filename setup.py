@@ -22,7 +22,7 @@ setup(
             "testpilot=testpilot.__main__:main",
         ],
         "pytest11": [
-            "testpilot=testpilot.interceptor",
+            "testpilot=testpilot.pytest_plugin",
         ],
     },
 )

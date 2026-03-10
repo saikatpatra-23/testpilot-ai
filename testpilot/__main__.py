@@ -110,6 +110,16 @@ def main():
     parser = argparse.ArgumentParser(prog="testpilot", description="TestPilot AI")
     sub = parser.add_subparsers(dest="command")
 
+    # Targeted — the main way to use TestPilot
+    diff_p = sub.add_parser("diff", help="[MAIN] Test only changed code (since a git ref)")
+    diff_p.add_argument("since", nargs="?", default="HEAD~1",
+                        help="Git ref to diff against (default: HEAD~1, use 'origin/main' for PRs)")
+    diff_p.add_argument("--config", default=None)
+
+    watch_p = sub.add_parser("watch", help="Watch for file changes, auto-test on every save")
+    watch_p.add_argument("--interval", type=int, default=3, help="Poll interval in seconds")
+    watch_p.add_argument("--config", default=None)
+
     init_p = sub.add_parser("init", help="Initialize TestPilot in any project (creates config.yaml + .vscode/tasks.json)")
     init_p.add_argument("--dir", default=None, help="Target directory (default: current dir)")
 
@@ -139,16 +149,27 @@ def main():
         print(f"Error: {e}")
         sys.exit(1)
 
+    if args.command == "diff":
+        from .targeted_runner import run_targeted
+        results = run_targeted(since=args.since, cfg=cfg)
+        failed = len(results.get("failed", []))
+        sys.exit(0 if failed == 0 else 1)
+
+    if args.command == "watch":
+        import testpilot
+        testpilot.watch(poll_interval=args.interval, config_path=args.config)
+        return
+
     if args.command == "init":
         from .init import run_init
         run_init(getattr(args, "dir", None))
         return
 
     dispatch = {
-        "run": cmd_run,
+        "run":      cmd_run,
         "generate": cmd_generate,
-        "solr": cmd_solr,
-        "react": cmd_react,
+        "solr":     cmd_solr,
+        "react":    cmd_react,
     }
     exit_code = dispatch[args.command](args, cfg)
     sys.exit(exit_code or 0)
