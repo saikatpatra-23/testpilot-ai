@@ -1,0 +1,144 @@
+{
+  "name": "testpilot-ai",
+  "displayName": "TestPilot AI",
+  "description": "AI-powered test generation for Python · Siebel CRM · SOLR · React stacks",
+  "version": "0.1.0",
+  "publisher": "testpilot-ai",
+  "icon": "media/icon.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Testing",
+    "Other"
+  ],
+  "keywords": [
+    "testing",
+    "ai",
+    "pytest",
+    "siebel",
+    "solr",
+    "playwright"
+  ],
+  "activationEvents": [
+    "onLanguage:python",
+    "workspaceContains:**/*.py"
+  ],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "testpilot.generateForFile",
+        "title": "TestPilot AI: Generate Tests for This File",
+        "icon": "$(beaker)"
+      },
+      {
+        "command": "testpilot.generateForDiff",
+        "title": "TestPilot AI: Generate Tests for Changed Files (git diff)",
+        "icon": "$(git-commit)"
+      },
+      {
+        "command": "testpilot.runAll",
+        "title": "TestPilot AI: Run All Tests",
+        "icon": "$(play)"
+      },
+      {
+        "command": "testpilot.runSolr",
+        "title": "TestPilot AI: Run SOLR Validation",
+        "icon": "$(database)"
+      },
+      {
+        "command": "testpilot.runReact",
+        "title": "TestPilot AI: Run React E2E",
+        "icon": "$(browser)"
+      },
+      {
+        "command": "testpilot.setup",
+        "title": "TestPilot AI: Initialize Project (create config.yaml)",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "testpilot.openConfig",
+        "title": "TestPilot AI: Open config.yaml",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "testpilot.showPanel",
+        "title": "TestPilot AI: Show Dashboard",
+        "icon": "$(testing-show-as-list-icon)"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "resourceLangId == python",
+          "command": "testpilot.generateForFile",
+          "group": "testpilot@1"
+        }
+      ],
+      "explorer/context": [
+        {
+          "when": "resourceLangId == python",
+          "command": "testpilot.generateForFile",
+          "group": "testpilot@1"
+        }
+      ],
+      "editor/title": [
+        {
+          "when": "resourceLangId == python",
+          "command": "testpilot.generateForFile",
+          "group": "navigation"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "testpilot-sidebar",
+          "title": "TestPilot AI",
+          "icon": "media/sidebar-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "testpilot-sidebar": [
+        {
+          "type": "webview",
+          "id": "testpilot.sidebarView",
+          "name": "TestPilot AI"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "TestPilot AI",
+      "properties": {
+        "testpilot.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Path to Python executable (or 'python' to use the active Python interpreter)"
+        },
+        "testpilot.configPath": {
+          "type": "string",
+          "default": "config.yaml",
+          "description": "Path to config.yaml relative to workspace root"
+        },
+        "testpilot.autoGenOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically generate tests when a Python file is saved"
+        }
+      }
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/saikatpatra-23/testpilot-ai"
+  },
+  "scripts": {
+    "package": "npx vsce package --no-dependencies",
+    "install-vsix": "code --install-extension testpilot-ai-0.1.0.vsix"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^2.32.0"
+  }
+}

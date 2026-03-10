@@ -1,0 +1,41 @@
+================================================================================
+  HOW TO BUILD & INSTALL THE VS CODE EXTENSION
+================================================================================
+
+PREREQUISITES
+─────────────
+  npm install -g @vscode/vsce    (once, globally)
+
+BUILD THE .vsix FILE
+────────────────────
+  cd vscode-extension/
+  npm install
+  npx vsce package --no-dependencies
+
+  This creates: testpilot-ai-0.1.0.vsix
+
+INSTALL IN VS CODE
+──────────────────
+  Option A — Command line:
+    code --install-extension testpilot-ai-0.1.0.vsix
+
+  Option B — VS Code UI:
+    1. Open VS Code
+    2. Ctrl+Shift+X (Extensions panel)
+    3. Click "..." (top right) → "Install from VSIX..."
+    4. Select testpilot-ai-0.1.0.vsix
+
+SHARE WITH YOUR TEAM
+────────────────────
+  Share the .vsix file in your org's shared drive / Slack / email.
+  Each developer installs it with:
+    code --install-extension testpilot-ai-0.1.0.vsix
+
+PUBLISH TO MARKETPLACE (optional, later)
+─────────────────────────────────────────
+  1. Create a publisher account: https://marketplace.visualstudio.com/manage
+  2. Get a PAT from Azure DevOps (Marketplace > Manage > Publisher)
+  3. npx vsce login <publisher-name>
+  4. npx vsce publish
+
+================================================================================

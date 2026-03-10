@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "testpilot-ai"
+version = "0.1.0"
+description = "AI-powered automated testing for Python · Siebel CRM · SOLR · React stacks"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+keywords = ["testing", "ai", "pytest", "siebel", "solr", "playwright", "automation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Testing",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "anthropic>=0.40.0",
+    "httpx>=0.27.0",
+    "pytest>=8.0.0",
+    "respx>=0.21.0",
+    "zeep>=4.2.1",
+    "pyyaml>=6.0.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest-cov>=5.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-json-report>=1.5.0",
+]
+
+[project.scripts]
+testpilot = "testpilot.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/saikatpatra-23/testpilot-ai"
+Repository = "https://github.com/saikatpatra-23/testpilot-ai"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["testpilot*"]

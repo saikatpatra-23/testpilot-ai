@@ -110,6 +110,9 @@ def main():
     parser = argparse.ArgumentParser(prog="testpilot", description="TestPilot AI")
     sub = parser.add_subparsers(dest="command")
 
+    init_p = sub.add_parser("init", help="Initialize TestPilot in any project (creates config.yaml + .vscode/tasks.json)")
+    init_p.add_argument("--dir", default=None, help="Target directory (default: current dir)")
+
     run_p = sub.add_parser("run", help="Run all test suites")
     run_p.add_argument("--config", default=None)
 
@@ -135,6 +138,11 @@ def main():
     except FileNotFoundError as e:
         print(f"Error: {e}")
         sys.exit(1)
+
+    if args.command == "init":
+        from .init import run_init
+        run_init(getattr(args, "dir", None))
+        return
 
     dispatch = {
         "run": cmd_run,
