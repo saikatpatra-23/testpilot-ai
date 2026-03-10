@@ -20,6 +20,9 @@ setup(
     entry_points={
         "console_scripts": [
             "testpilot=testpilot.__main__:main",
-        ]
+        ],
+        "pytest11": [
+            "testpilot=testpilot.interceptor",
+        ],
     },
 )
