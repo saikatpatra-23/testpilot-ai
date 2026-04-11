@@ -10,16 +10,29 @@
   },
   "categories": [
     "Testing",
+    "Machine Learning",
     "Other"
   ],
   "keywords": [
-    "testing",
     "ai",
+    "testing",
     "pytest",
-    "siebel",
+    "test generation",
+    "python",
+    "unit tests",
+    "claude",
+    "anthropic",
     "solr",
-    "playwright"
+    "playwright",
+    "siebel",
+    "automation",
+    "tdd",
+    "ci cd"
   ],
+  "galleryBanner": {
+    "color": "#1e1e2e",
+    "theme": "dark"
+  },
   "activationEvents": [
     "onLanguage:python",
     "workspaceContains:**/*.py"
@@ -139,6 +152,7 @@
     "install-vsix": "code --install-extension testpilot-ai-0.1.0.vsix"
   },
   "devDependencies": {
-    "@vscode/vsce": "^2.32.0"
+    "@vscode/vsce": "^2.32.0",
+    "ovsx": "^0.10.10"
   }
 }
