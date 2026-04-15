@@ -4,14 +4,100 @@ const vscode = require('vscode');
 const { exec, spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 
 let outputChannel;
 let statusBarItem;
 let sidebarProvider;
+let extensionContext;
+
+// ─── License & Usage ─────────────────────────────────────────────────────────
+
+const FREE_MONTHLY_LIMIT = 20;
+const GUMROAD_PRODUCT_ID = 'testpilot-ai-pro'; // set after Gumroad product created
+
+async function getLicenseState() {
+  const key = vscode.workspace.getConfiguration('testpilot').get('licenseKey', '').trim();
+  if (!key) return { plan: 'free' };
+
+  // Return cached result if validated within last 24h
+  const cached = extensionContext.globalState.get('licenseCache');
+  if (cached && cached.key === key && Date.now() - cached.ts < 86400000) {
+    return cached.state;
+  }
+
+  // Validate against Gumroad license API
+  try {
+    const result = await gumroadVerify(key);
+    const state = result.success ? { plan: 'pro', email: result.purchase?.email } : { plan: 'free', error: 'Invalid license key' };
+    extensionContext.globalState.update('licenseCache', { key, ts: Date.now(), state });
+    return state;
+  } catch {
+    return { plan: 'free', error: 'Could not verify license (offline?)' };
+  }
+}
+
+function gumroadVerify(licenseKey) {
+  return new Promise((resolve, reject) => {
+    const body = `product_permalink=${GUMROAD_PRODUCT_ID}&license_key=${encodeURIComponent(licenseKey)}`;
+    const req = https.request({
+      hostname: 'api.gumroad.com',
+      path: '/v2/licenses/verify',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) }
+    }, res => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => { try { resolve(JSON.parse(data)); } catch { reject(new Error('Bad response')); } });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+function getUsageThisMonth() {
+  const usage = extensionContext.globalState.get('usageLog', {});
+  const month = new Date().toISOString().slice(0, 7); // "2026-04"
+  return usage[month] || 0;
+}
+
+function incrementUsage() {
+  const usage = extensionContext.globalState.get('usageLog', {});
+  const month = new Date().toISOString().slice(0, 7);
+  usage[month] = (usage[month] || 0) + 1;
+  // Keep only last 3 months
+  const keys = Object.keys(usage).sort();
+  if (keys.length > 3) delete usage[keys[0]];
+  extensionContext.globalState.update('usageLog', usage);
+  return usage[month];
+}
+
+async function checkGenerationQuota() {
+  const license = await getLicenseState();
+  if (license.plan === 'pro') return { allowed: true, plan: 'pro' };
+
+  const used = getUsageThisMonth();
+  if (used >= FREE_MONTHLY_LIMIT) {
+    const action = await vscode.window.showWarningMessage(
+      `TestPilot Free: ${used}/${FREE_MONTHLY_LIMIT} generations used this month.`,
+      'Upgrade to Pro',
+      'Enter License Key'
+    );
+    if (action === 'Upgrade to Pro') {
+      vscode.env.openExternal(vscode.Uri.parse('https://classy5b.gumroad.com/l/testpilot-ai-pro'));
+    } else if (action === 'Enter License Key') {
+      vscode.commands.executeCommand('testpilot.enterLicense');
+    }
+    return { allowed: false };
+  }
+  return { allowed: true, plan: 'free', used, remaining: FREE_MONTHLY_LIMIT - used };
+}
 
 // ─── Activation ──────────────────────────────────────────────────────────────
 
 function activate(context) {
+  extensionContext = context;
   outputChannel = vscode.window.createOutputChannel('TestPilot AI');
   statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   statusBarItem.command = 'testpilot.showPanel';
@@ -29,13 +115,15 @@ function activate(context) {
   // Register commands
   const commands = [
     ['testpilot.generateForFile',  () => generateForCurrentFile()],
-    ['testpilot.generateForDiff',  () => runTestpilot('generate --diff HEAD~1', 'Generating tests for changed files...')],
+    ['testpilot.generateForDiff',  () => generateForDiffWithQuota()],
     ['testpilot.runAll',           () => runTestpilot('run', 'Running all tests...')],
     ['testpilot.runSolr',          () => runTestpilot('solr', 'Running SOLR validation...')],
     ['testpilot.runReact',         () => runTestpilot('react', 'Running React E2E...')],
     ['testpilot.setup',            () => setupProject()],
     ['testpilot.openConfig',       () => openConfig()],
     ['testpilot.showPanel',        () => sidebarProvider.focus()],
+    ['testpilot.enterLicense',     () => enterLicense()],
+    ['testpilot.showPlan',         () => showPlanStatus()],
   ];
 
   commands.forEach(([cmd, fn]) =>
@@ -47,13 +135,63 @@ function activate(context) {
     vscode.workspace.onDidSaveTextDocument((doc) => {
       const cfg = vscode.workspace.getConfiguration('testpilot');
       if (cfg.get('autoGenOnSave') && doc.languageId === 'python') {
-        generateForFile(doc.uri.fsPath);
+        generateForFileWithQuota(doc.uri.fsPath);
       }
     })
   );
 
   // Check if testpilot is installed
   checkInstallation();
+
+  // Show plan badge on startup
+  updateStatusBarPlan();
+}
+
+async function updateStatusBarPlan() {
+  const license = await getLicenseState();
+  if (license.plan === 'pro') {
+    statusBarItem.tooltip = 'TestPilot AI Pro — Click to open dashboard';
+  } else {
+    const used = getUsageThisMonth();
+    statusBarItem.tooltip = `TestPilot AI Free (${used}/${FREE_MONTHLY_LIMIT} this month) — Click to open dashboard`;
+  }
+}
+
+async function enterLicense() {
+  const key = await vscode.window.showInputBox({
+    prompt: 'Enter your TestPilot AI Pro license key',
+    placeHolder: 'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX',
+    ignoreFocusOut: true
+  });
+  if (!key) return;
+
+  vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Verifying license...' }, async () => {
+    await vscode.workspace.getConfiguration('testpilot').update('licenseKey', key.trim(), vscode.ConfigurationTarget.Global);
+    extensionContext.globalState.update('licenseCache', null); // clear cache
+    const state = await getLicenseState();
+    if (state.plan === 'pro') {
+      vscode.window.showInformationMessage(`TestPilot AI Pro activated! Welcome${state.email ? ', ' + state.email : ''}.`);
+      updateStatusBarPlan();
+    } else {
+      vscode.window.showErrorMessage('License key invalid. Check your key or purchase at gumroad.com/l/testpilot-ai-pro');
+    }
+  });
+}
+
+async function showPlanStatus() {
+  const license = await getLicenseState();
+  const used = getUsageThisMonth();
+  if (license.plan === 'pro') {
+    vscode.window.showInformationMessage('TestPilot AI Pro — Unlimited generations active.');
+  } else {
+    const action = await vscode.window.showInformationMessage(
+      `TestPilot AI Free — ${used}/${FREE_MONTHLY_LIMIT} generations used this month.`,
+      'Upgrade to Pro'
+    );
+    if (action === 'Upgrade to Pro') {
+      vscode.env.openExternal(vscode.Uri.parse('https://classy5b.gumroad.com/l/testpilot-ai-pro'));
+    }
+  }
 }
 
 // ─── Core runner ─────────────────────────────────────────────────────────────
@@ -128,7 +266,7 @@ function runTestpilot(args, label, onDone) {
   });
 }
 
-function generateForCurrentFile() {
+async function generateForCurrentFile() {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
     vscode.window.showErrorMessage('TestPilot: Open a Python file first');
@@ -138,7 +276,23 @@ function generateForCurrentFile() {
     vscode.window.showErrorMessage('TestPilot: Only works on Python files');
     return;
   }
-  generateForFile(editor.document.uri.fsPath);
+  await generateForFileWithQuota(editor.document.uri.fsPath);
+}
+
+async function generateForDiffWithQuota() {
+  const quota = await checkGenerationQuota();
+  if (!quota.allowed) return;
+  incrementUsage();
+  updateStatusBarPlan();
+  runTestpilot('generate --diff HEAD~1', 'Generating tests for changed files...');
+}
+
+async function generateForFileWithQuota(filePath) {
+  const quota = await checkGenerationQuota();
+  if (!quota.allowed) return;
+  incrementUsage();
+  updateStatusBarPlan();
+  generateForFile(filePath);
 }
 
 function generateForFile(filePath) {

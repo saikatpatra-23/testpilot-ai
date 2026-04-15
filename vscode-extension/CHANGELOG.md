@@ -2,6 +2,19 @@
 
 All notable changes to TestPilot AI are documented here.
 
+## [0.1.2] — 2026-04-11
+
+### Fixed
+- Updated Pro upgrade link to correct Gumroad product URL
+
+## [0.1.1] — 2026-04-11
+
+### Added
+- **Freemium system**: Free tier includes 20 test generations per month
+- **Pro license key**: Enter license key to unlock unlimited generations (`TestPilot AI: Enter License Key`)
+- **Plan status command**: See current usage and plan (`TestPilot AI: Show Plan & Usage`)
+- **License validation**: Keys validated via Gumroad API with 24h cache
+
 ## [0.1.0] — 2026-04-11
 
 ### Initial Release

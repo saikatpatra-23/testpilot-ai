@@ -1,8 +1,8 @@
 {
   "name": "testpilot-ai",
-  "displayName": "TestPilot AI",
-  "description": "AI-powered test generation for Python · Siebel CRM · SOLR · React stacks",
-  "version": "0.1.0",
+  "displayName": "TestPilot AI — Unit Test Generator",
+  "description": "Generate unit tests instantly with AI. Right-click any Python file → get pytest tests in seconds. Free tier included.",
+  "version": "0.2.0",
   "publisher": "testpilot-ai",
   "icon": "media/icon.png",
   "engines": {
@@ -14,20 +14,25 @@
     "Other"
   ],
   "keywords": [
-    "ai",
-    "testing",
+    "ai test generator",
+    "unit test",
     "pytest",
     "test generation",
     "python",
-    "unit tests",
+    "ai testing",
+    "auto test",
+    "test coverage",
+    "tdd",
+    "ai",
     "claude",
     "anthropic",
-    "solr",
-    "playwright",
-    "siebel",
-    "automation",
-    "tdd",
-    "ci cd"
+    "test automation",
+    "unit testing",
+    "code coverage",
+    "test cases",
+    "ai code",
+    "developer tools",
+    "productivity"
   ],
   "galleryBanner": {
     "color": "#1e1e2e",
@@ -79,6 +84,16 @@
         "command": "testpilot.showPanel",
         "title": "TestPilot AI: Show Dashboard",
         "icon": "$(testing-show-as-list-icon)"
+      },
+      {
+        "command": "testpilot.enterLicense",
+        "title": "TestPilot AI: Enter License Key",
+        "icon": "$(key)"
+      },
+      {
+        "command": "testpilot.showPlan",
+        "title": "TestPilot AI: Show Plan & Usage",
+        "icon": "$(account)"
       }
     ],
     "menus": {
@@ -139,6 +154,11 @@
           "type": "boolean",
           "default": false,
           "description": "Automatically generate tests when a Python file is saved"
+        },
+        "testpilot.licenseKey": {
+          "type": "string",
+          "default": "",
+          "description": "TestPilot AI Pro license key. Get one at https://saikatpatra.gumroad.com/l/testpilot-ai-pro"
         }
       }
     }
