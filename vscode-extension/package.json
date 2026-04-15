@@ -1,8 +1,8 @@
 {
   "name": "testpilot-ai",
   "displayName": "TestPilot AI — Unit Test Generator",
-  "description": "Generate unit tests instantly with AI. Right-click any Python file → get pytest tests in seconds. Free tier included.",
-  "version": "0.2.0",
+  "description": "Generate pytest tests instantly — no API key needed. Right-click any Python file → tests in seconds. Free tier: 20/month.",
+  "version": "0.3.0",
   "publisher": "testpilot-ai",
   "icon": "media/icon.png",
   "engines": {
