@@ -14,7 +14,7 @@ let extensionContext;
 
 // ─── Backend & License ────────────────────────────────────────────────────────
 
-const BACKEND_URL = 'https://testpilot-backend-production.up.railway.app';
+const BACKEND_URL = 'https://testpilot-backend-production-02b4.up.railway.app';
 const FREE_MONTHLY_LIMIT = 20;
 const GUMROAD_PRODUCT_ID = 'testpilot-ai-pro';
 
